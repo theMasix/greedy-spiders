@@ -1,9 +1,15 @@
 // Checking gameMode and track it
 let gameMode = 0;
+let gamePlay = false;
 let selectMode = $('#select-mode');
 selectMode.on('change', () => {
-  gameMode = selectMode.val();
+  gameMode = Number(selectMode.val());
   // console.log(gameMode);
+});
+
+let startButton = $('.start-button');
+startButton.on('click', () => {
+  Game.setGamePlay(true);
 });
 
 // Reading file from input
@@ -47,9 +53,9 @@ procGraph.writeNodesIndex = function() {
 };
 
 // Run writeNodesIndex automaticly and with intervals
-// setInterval(() => {
-//   procGraph.writeNodesIndex();
-// }, 50);
+setInterval(() => {
+  procGraph.writeNodesIndex();
+}, 50);
 
 procGraph.hasLink = function(nodeIndex1, nodeIndex2) {
   for (aLink of links) {
@@ -271,11 +277,24 @@ procGraph.addButterfly = function() {
     searchElement.addClass('butterfly');
   }
 };
+procGraph.removeSpider = function() {
+  let lastSpider = $('.spider');
+  lastSpider.removeClass('spider');
+};
 procGraph.addSpider = function() {
+  // First remove last spider
+  procGraph.removeSpider();
+
   let searchElement = $('.node_selected');
   if (searchElement.length) {
     searchElement.addClass('spider');
   }
+};
+procGraph.moveSpider = function(newSpiderNodeIndex) {
+  // First remove last spider
+  procGraph.removeSpider();
+  // Then add new spider
+  procGraph.addClass('spider', newSpiderNodeIndex);
 };
 
 // preparing a variable to save and download.
@@ -348,22 +367,29 @@ Game.createNodesObject = function(gameGraph) {
   return allNodes;
 };
 
-// Game.unCheckNodes = function() {
-//   for (aNode of this.allNodes) {
-//     if (!aNode.isButterfly) {
-//       aNode.isChecked = false;
-//     }
-//   }
-// };
+Game.hasSetsSubscription = function(nodes) {
+  let dict = [];
+  for (aNode of nodes) {
+    for (edgeInSet of aNode.set) {
+      if (dict.indexOf(edgeInSet) != -1) return true;
+      dict.push(edgeInSet);
+    }
+  }
+  return false;
+};
 
-// Game.checkWinner = function() {};
+// This create an edge based on our principles
+// it means that node with lower index should write before another
+Game.makeEdge = function(index1, index2) {
+  let edge = [Math.min(index1, index2), Math.max(index1, index2)];
+  return edge;
+};
 
 Game.createWinners = function(butterfliesIndexes) {
   // First initialize the base
   // It means we first specify all butterflies as winners
   for (butterflyIndex of butterfliesIndexes) {
     let butterfly = this.allNodes[butterflyIndex];
-    // butterfly.isChecked = true;
     butterfly.isWinner = true;
     butterfly.isButterfly = true;
     // butterfly.set remains empty
@@ -377,9 +403,6 @@ Game.createWinners = function(butterfliesIndexes) {
 
     // If the currentNode is butterfly, we should ignore it
     if (currentNode.isButterfly) continue;
-    // if (currentNode.isChecked) continue;
-    // Let's check it!
-    // currentNode.isChecked = true;
 
     let winnerNeighbors = currentNode.getWinnerNeighbors();
 
@@ -410,50 +433,71 @@ Game.createWinners = function(butterfliesIndexes) {
         let newSet = currentNode.createNewSet(winnerNeighborsEdges, winnerNeighbors);
 
         if (!areArraysEqual(newSet, currentNode.set) || true != currentNode.isWinner) {
-          // console.log(newSetJSON != currentNodeSetJSON);
-          // console.log(true != currentNode.isWinner);
           currentNode.isWinner = true;
           currentNode.set = newSet;
           // let's refresh the loop
           stateChange = true;
-          // if (currentNode.index == 4 || currentNode.index == 6) {
-          // if (true) {
-          //   console.log(winnerNeighbors);
-          //   console.log(winnerNeighborsEdges);
-          //   console.log(newSet);
-          //   console.log(currentNode);
-          // }
         }
       }
     }
 
     if (stateChange) {
-      console.log('refreshed!');
+      // console.log('refreshed!');
       // Reset main loop
       mainIterator = -1;
       refreshCount += 1;
-      // Reset isChecked for each node
-      // Game.unCheckNodes();
     }
   }
 };
 
-Game.hasSetsSubscription = function(nodes) {
-  let dict = [];
-  for (aNode of nodes) {
-    for (edgeInSet of aNode.set) {
-      if (dict.indexOf(edgeInSet) != -1) return true;
-      dict.push(edgeInSet);
+Game.bfs = function(spiderNode) {
+  let foundedNode = undefined;
+  let queue = [];
+  spiderNode.bfs.isSeen = true;
+  queue.push(spiderNode);
+
+  while (queue.length != 0) {
+    let current = queue.shift();
+
+    // If we go to next level from our last founded isWinner
+    if (foundedNode && current.bfs.parent != foundedNode.bfs.parent) {
+      break;
+    }
+
+    if (current.isWinner) {
+      // We found a butterfly
+      foundedNode = current;
+
+      // If the node is butterfly, we exit from bfs searching
+      if (foundedNode.isButterfly) break;
+    }
+    for (aNode of current.neighbors) {
+      if (!aNode.bfs.isSeen) {
+        aNode.bfs.isSeen = true;
+        aNode.bfs.parent = current;
+        queue.push(aNode);
+      }
     }
   }
-  return false;
-};
 
-// This create an edge based on our principles
-// it means that node with lower index should write before another
-Game.makeEdge = function(index1, index2) {
-  let edge = [Math.min(index1, index2), Math.max(index1, index2)];
-  return edge;
+  // Lets make route from start to end
+  let route = [];
+  let routeNode = foundedNode;
+  // This means we didn't found any route to a winner node
+  if (!foundedNode) return foundedNode;
+
+  route.unshift(routeNode);
+  while (routeNode.bfs.parent) {
+    routeNode = routeNode.bfs.parent;
+    route.unshift(routeNode);
+  }
+
+  // Lets clear our nodes
+  for (aNode of Game.allNodes) {
+    aNode.bfs.parent = undefined;
+    aNode.bfs.isSeen = false;
+  }
+  return route;
 };
 
 Game.play = function() {
@@ -470,7 +514,73 @@ Game.play = function() {
 
   let butterfliesIndexes = procGraph.getButterflies();
   Game.createWinners(butterfliesIndexes);
-  console.log(this.allNodes);
+
+  // computer plays as spider
+  if (gameMode == 0) {
+    // DistinationNode: [targetNode.index, targetNode.isButterfly]
+    let distinationNode = Game.bestMove();
+    procGraph.moveSpider(distinationNode.index);
+
+    if (distinationNode.isButterfly) {
+      text = `شما باختید! عنکبوت به پروانه رسید`;
+      toast(text, 'red');
+
+      // Stop the Game
+      Game.setGamePlay(false);
+    }
+  }
+
+  // Reset date
+  this.allNodes = [];
+};
+
+Game.bestMove = function() {
+  let distNode = undefined;
+  let response;
+  // Lets find spider
+  let spidersIndex = procGraph.getSpiders();
+  if (spidersIndex.length == 0) {
+    window.alert("First specify where is the spider! Select a node then hit 's' on keyboard");
+    return;
+  }
+  // Get the first spider node
+  let spiderNode = this.allNodes[spidersIndex[0]];
+
+  if (spiderNode.isWinner) {
+    let winnerNeighbors = spiderNode.getWinnerNeighbors();
+
+    // Lets pick a winnerNeighbor
+    distNode = winnerNeighbors[0];
+
+    // Search in winnerNeighbors to find if there is a butterfly
+    for (winnerNeighbor of winnerNeighbors) {
+      if (winnerNeighbors.isButterfly) {
+        // Now we change current distNode
+        distNode = winnerNeighbor;
+        break;
+      }
+    }
+  } else {
+    let bfs = Game.bfs(spiderNode);
+    if (!bfs) {
+      // It means butterflies won
+      text = `شما بردید! عنکبوت دیگه راهی نداره که ببره`;
+      toast(text);
+
+      // Stop the game
+      Game.setGamePlay(false);
+    }
+    distNode = bfs[1];
+  }
+  return distNode;
+};
+
+Game.setGamePlay = function(newGamePlay) {
+  gamePlay = newGamePlay;
+  if (newGamePlay) {
+    text = `بازی شروع شده! حرکتت رو انجام بده`;
+    toast(text);
+  }
 };
 
 function Node(index) {
@@ -481,7 +591,7 @@ function Node(index) {
   this.set = [];
   this.neighbors = [];
   this.bfs = {};
-  this.bfs.seen = false;
+  this.bfs.isSeen = false;
   this.bfs.parent = undefined;
 
   this.getWinnerNeighbors = function() {
@@ -538,19 +648,22 @@ function Node(index) {
 // Enable hotkeys
 window.addEventListener('keydown', e => {
   key = e.key;
-  // console.log(key);
   switch (key) {
     case 'b':
       procGraph.addButterfly(key);
       break;
     case 's':
       procGraph.addSpider(key);
+      if (gamePlay && gameMode == 1) {
+        // We know that we should play as protector
+        Game.play();
+      }
       break;
     case 'e':
       procGraph.createExportFile();
       break;
     case 'r':
-      Game.play();
+      Game.setGamePlay(true);
   }
 });
 

@@ -236,6 +236,7 @@ function spliceLinksForNode(node) {
 
 function keydown() {
   if (!selected_node && !selected_link) return;
+
   switch (d3.event.keyCode) {
     case 8: // backspace
     case 46: {
@@ -249,6 +250,9 @@ function keydown() {
       selected_link = null;
       selected_node = null;
       redraw();
+      if (gamePlay && gameMode == 0) {
+        Game.play();
+      }
       break;
     }
   }

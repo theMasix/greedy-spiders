@@ -1,8 +1,15 @@
+@font-face {
+  font-family: 'Open Sans';
+  src: url("/assets/font/OpenSans-Regular.ttf");
+}
+
 body {
-  font: 13px sans-serif;
-  position: relative;
-  /* width: 960px;
-  height: 500px; */
+  font-family: 'iranyekan', 'Open Sans';
+  font-size: 16px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 form {
@@ -103,4 +110,48 @@ form {
   -ms-user-select: none;
   user-select: none;
   font-size: 10px;
+}
+
+/* Toast */
+
+.toast-box {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: reverse;
+  -ms-flex-flow: column-reverse wrap;
+  flex-flow: column-reverse wrap;
+  max-height: 600px;
+  overflow: hidden;
+}
+
+.toast {
+  max-height: 50px;
+  width: auto;
+  padding: 10px 15px;
+  background-color: #44bd32;
+  color: white;
+  border-radius: 5px;
+  opacity: 0;
+  margin: 5px 10px;
+  border: 1px solid #185a9d;
+  -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.toast:first-child {
+  margin-bottom: 20px !important;
+}
+
+.red {
+  background: #e74c3c;
+  color: white;
+}
+
+.green {
+  background-color: #44bd32;
 }
