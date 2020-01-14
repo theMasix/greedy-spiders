@@ -127,6 +127,7 @@ form {
   flex-flow: column-reverse wrap;
   max-height: 600px;
   overflow: hidden;
+  direction: rtl;
 }
 
 .toast {

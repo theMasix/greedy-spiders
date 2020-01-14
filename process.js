@@ -1,6 +1,3 @@
-// Checking gameMode and track it
-let gameMode = 0;
-let gamePlay = false;
 let selectMode = $('#select-mode');
 selectMode.on('change', () => {
   gameMode = Number(selectMode.val());
@@ -43,8 +40,8 @@ procGraph.writeNodesIndex = function() {
     let aNode = nodes[aNodeIndex];
     let aNodeXPosition = aNode.x;
     let aNodeYPosition = aNode.y;
-    let textSVGElement = `<span style="left:${aNodeXPosition - 5}px; top:${aNodeYPosition -
-      5}px;" fill="red";" class="node-index" data-node-index="${aNodeIndex}">${aNodeIndex}</span>`;
+    let textSVGElement = `<span style="left:${aNodeXPosition - 3}px; top:${aNodeYPosition -
+      8}px;" fill="red";" class="node-index" data-node-index="${aNodeIndex}">${aNodeIndex}</span>`;
     // console.log(textSVGElement);
     $('svg')
       .parent()
@@ -52,10 +49,12 @@ procGraph.writeNodesIndex = function() {
   }
 };
 
-// Run writeNodesIndex automaticly and with intervals
-setInterval(() => {
-  procGraph.writeNodesIndex();
-}, 50);
+if (writeIndexOnNodes) {
+  // Run writeNodesIndex automaticly and with intervals
+  setInterval(() => {
+    procGraph.writeNodesIndex();
+  }, 20);
+}
 
 procGraph.hasLink = function(nodeIndex1, nodeIndex2) {
   for (aLink of links) {
@@ -396,7 +395,7 @@ Game.createWinners = function(butterfliesIndexes) {
   }
   let graphSize = this.allNodes.length;
 
-  let refreshCount = 1;
+  // let refreshCount = 1;
   for (mainIterator = 0; mainIterator < graphSize; mainIterator++) {
     let stateChange = false;
     let currentNode = this.allNodes[mainIterator];
@@ -429,7 +428,7 @@ Game.createWinners = function(butterfliesIndexes) {
       // Now we create a set and check it if the loop should be restart
       if (couldBeWinner) {
         // Create a count edges object to know what edges should be in set
-        let winnerNeighborsEdges = currentNode.countEdges(winnerNeighbors);
+        let winnerNeighborsEdges = Game.makeDictFromNodesSet(winnerNeighbors);
         let newSet = currentNode.createNewSet(winnerNeighborsEdges, winnerNeighbors);
 
         if (!areArraysEqual(newSet, currentNode.set) || true != currentNode.isWinner) {
@@ -445,7 +444,7 @@ Game.createWinners = function(butterfliesIndexes) {
       // console.log('refreshed!');
       // Reset main loop
       mainIterator = -1;
-      refreshCount += 1;
+      // refreshCount += 1;
     }
   }
 };
@@ -500,51 +499,8 @@ Game.bfs = function(spiderNode) {
   return route;
 };
 
-Game.play = function() {
-  let gameGraph = procGraph.getGraphMatrix();
-  this.allNodes = Game.createNodesObject(gameGraph);
-
-  // add nodes index to svg circle class
-  // This is temporary
-  for (aNode of this.allNodes) {
-    procGraph.addClass(String(aNode.index), aNode.index);
-  }
-
-  procGraph.writeNodesIndex();
-
-  let butterfliesIndexes = procGraph.getButterflies();
-  Game.createWinners(butterfliesIndexes);
-
-  // computer plays as spider
-  if (gameMode == 0) {
-    // DistinationNode: [targetNode.index, targetNode.isButterfly]
-    let distinationNode = Game.bestMove();
-    procGraph.moveSpider(distinationNode.index);
-
-    if (distinationNode.isButterfly) {
-      text = `شما باختید! عنکبوت به پروانه رسید`;
-      toast(text, 'red');
-
-      // Stop the Game
-      Game.setGamePlay(false);
-    }
-  }
-
-  // Reset date
-  this.allNodes = [];
-};
-
-Game.bestMove = function() {
+Game.bestMove = function(spiderNode) {
   let distNode = undefined;
-  let response;
-  // Lets find spider
-  let spidersIndex = procGraph.getSpiders();
-  if (spidersIndex.length == 0) {
-    window.alert("First specify where is the spider! Select a node then hit 's' on keyboard");
-    return;
-  }
-  // Get the first spider node
-  let spiderNode = this.allNodes[spidersIndex[0]];
 
   if (spiderNode.isWinner) {
     let winnerNeighbors = spiderNode.getWinnerNeighbors();
@@ -554,7 +510,7 @@ Game.bestMove = function() {
 
     // Search in winnerNeighbors to find if there is a butterfly
     for (winnerNeighbor of winnerNeighbors) {
-      if (winnerNeighbors.isButterfly) {
+      if (winnerNeighbor.isButterfly) {
         // Now we change current distNode
         distNode = winnerNeighbor;
         break;
@@ -575,12 +531,157 @@ Game.bestMove = function() {
   return distNode;
 };
 
+Game.bestCut = function(spiderNode) {
+  let chosenEdge = undefined;
+  // Lets create a dict with all nodes
+  let generalDict = Game.makeDictFromNodesSet(this.allNodes);
+
+  let winnerNeighbors = spiderNode.getWinnerNeighbors();
+  if (winnerNeighbors.length == 0) {
+    // If spider node has no node which is a winner
+    // We cut an edge that more winners will transform to not winners
+
+    // Find the most common edge in generalDict
+    let mostEdgesCount = 0;
+    for (setOfEdges of generalDict) {
+      if (setOfEdges.length > mostEdgesCount) {
+        mostEdgesCount = setOfEdges.length;
+        chosenEdge = setOfEdges[0];
+      }
+    }
+  } else {
+    // Then we cut an edge which is in the all winner neighbors set and is the most common in other winner neighbors node
+
+    // Lets create a dict with all spiderNode winner neighbors
+    winnerNeighborsSetDict = Game.makeDictFromNodesSet(winnerNeighbors);
+
+    // Create an array which has edges that are in all winner neighbors
+    let subscriptionSet = [];
+    for (setGroup of winnerNeighborsSetDict) {
+      if (setGroup.length == winnerNeighbors.length) {
+        subscriptionSet.push(setGroup[0]);
+      }
+    }
+
+    console.log(subscriptionSet);
+
+    if (subscriptionSet.length == 0) {
+      // If it happens, we know that a butterfly is in the neighbors
+
+      // Let's find the butterfly neighbor
+      for (aNode of winnerNeighbors) {
+        if (aNode.isButterfly) {
+          let butterflyNeighbor = aNode;
+        }
+      }
+
+      chosenEdge = Game.makeEdge(spiderNode.index, butterflyNeighbor.index);
+      return chosenEdge;
+    }
+
+    // Find the most common edge in generalDict which is also in subscriptionSet
+    let mostEdgesCount = 0;
+    for (setOfEdges of generalDict) {
+      if (setOfEdges.length > mostEdgesCount && isArrayExistsInArray(subscriptionSet, setOfEdges[0])) {
+        mostEdgesCount = setOfEdges.length;
+        chosenEdge = setOfEdges[0];
+      }
+    }
+  }
+  console.log(chosenEdge);
+  return chosenEdge;
+};
+
 Game.setGamePlay = function(newGamePlay) {
   gamePlay = newGamePlay;
+
+  let spidersIndex = procGraph.getSpiders();
+  if (spidersIndex.length == 0) {
+    text = `اول عنکبوت رو مشخص کن. روی یه راس کلیک کن و حرف s رو بزن `;
+    toast(text, 'red');
+    return;
+  }
+
+  let butterflyIndexes = procGraph.getButterflies();
+  if (butterflyIndexes.length == 0) {
+    text = `اول پروان ها رو مشخص کن. روی یه راس کلیک کن و حرف b رو بزن `;
+    toast(text, 'red');
+    return;
+  }
+
+  // If there was no error
   if (newGamePlay) {
     text = `بازی شروع شده! حرکتت رو انجام بده`;
     toast(text);
   }
+};
+
+Game.makeDictFromNodesSet = function(someNodes) {
+  let mydict = [];
+  let founded = false;
+  for (winnerNeighbor of someNodes) {
+    for (winnerSetEdge of winnerNeighbor.set) {
+      for (el of mydict) {
+        if (isArrayExistsInArray(el, winnerSetEdge)) {
+          el.push(winnerSetEdge);
+          founded = true;
+          break;
+        }
+      }
+      if (!founded) {
+        mydict.push([winnerSetEdge]);
+        founded = false;
+      }
+    }
+  }
+  return mydict;
+};
+
+Game.play = function() {
+  let gameGraph = procGraph.getGraphMatrix();
+  this.allNodes = Game.createNodesObject(gameGraph);
+  console.log(this.allNodes);
+
+  // add nodes index to svg circle class
+  // This is temporary
+  for (aNode of this.allNodes) {
+    procGraph.addClass(String(aNode.index), aNode.index);
+  }
+
+  let butterfliesIndexes = procGraph.getButterflies();
+  Game.createWinners(butterfliesIndexes);
+
+  // Get the first spider node
+  let spidersIndex = procGraph.getSpiders();
+  let spiderNode = this.allNodes[spidersIndex[0]];
+
+  // computer plays as spider
+  if (gameMode == 0) {
+    // DistinationNode: [targetNode.index, targetNode.isButterfly]
+    let distinationNode = Game.bestMove(spiderNode);
+    procGraph.moveSpider(distinationNode.index);
+
+    if (distinationNode.isButterfly) {
+      text = `شما باختید! عنکبوت به پروانه رسید`;
+      toast(text, 'red');
+
+      // Stop the Game
+      Game.setGamePlay(false);
+    }
+  }
+
+  // Computer plays as protector
+  if (gameMode == 1) {
+    let distinationLink = Game.bestCut(spiderNode);
+    console.log(distinationLink);
+    // Delete the link
+    let fromNodeIndex = distinationLink[0];
+    let targetNodeIndex = distinationLink[1];
+    procGraph.removeLink(fromNodeIndex, targetNodeIndex);
+  }
+
+  // Reset date
+  this.allNodes = [];
 };
 
 function Node(index) {
@@ -607,6 +708,7 @@ function Node(index) {
 
     return winnerNeighbors;
   };
+
   this.createNewSet = function(neighborsEdgeDict, winnerNeighbors) {
     let newSet = [];
 
@@ -624,24 +726,6 @@ function Node(index) {
       newSet.push(edge);
     }
     return newSet;
-  };
-  this.countEdges = function(winnerNeighbors) {
-    let mydict = [];
-    let founded = false;
-    for (winnerNeighbor of winnerNeighbors) {
-      for (winnerSetEdge of winnerNeighbor.set) {
-        for (el of mydict) {
-          if (el.indexOf(winnerSetEdge) != -1) {
-            el.push(winnerSetEdge);
-            founded = true;
-          }
-        }
-        if (!founded) {
-          mydict.push([winnerSetEdge]);
-        }
-      }
-    }
-    return mydict;
   };
 }
 

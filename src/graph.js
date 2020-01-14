@@ -54,6 +54,8 @@ redraw();
 svg.node().focus();
 
 function mousedown() {
+  // Exit if the game is playing
+  if (gamePlay) return;
   if (!mousedown_node && !mousedown_link) {
     selected_node = null;
     selected_link = null;
@@ -75,6 +77,8 @@ function mousedown() {
 }
 
 function mousemove() {
+  // Exit if the game is playing
+  if (gamePlay) return;
   if (!mousedown_node) return;
 
   dragged = true;
@@ -87,6 +91,8 @@ function mousemove() {
 }
 
 function mouseup() {
+  // Exit if the game is playing
+  if (gamePlay) return;
   // hide drag line
   drag_line.attr('class', 'drag_line_hidden');
 
