@@ -241,6 +241,8 @@ function spliceLinksForNode(node) {
 }
 
 function keydown() {
+  // Exit if the game is playing and computer plays as protector
+  if (gameMode && gameMode == 1) return;
   if (!selected_node && !selected_link) return;
 
   switch (d3.event.keyCode) {

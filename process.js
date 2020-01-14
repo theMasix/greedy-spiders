@@ -100,6 +100,17 @@ procGraph.addClass = function(newClass, targetNodeIndex) {
     }
   }
 };
+
+procGraph.addData = function(dataName, dataToAdd, targetNodeIndex) {
+  for (aNode of nodes) {
+    if (aNode.index == targetNodeIndex) {
+      let targetXPosition = aNode.x;
+      let target = $(`[cx='${targetXPosition}']`);
+      target.attr(`data-${dataName}`, dataToAdd);
+      break;
+    }
+  }
+};
 procGraph.removeClass = function(oldClass, targetNodeIndex) {
   for (aNode of nodes) {
     if (aNode.index == targetNodeIndex) {
@@ -281,12 +292,48 @@ procGraph.removeSpider = function() {
   lastSpider.removeClass('spider');
 };
 procGraph.addSpider = function() {
+  let newSpiderEl = $('.node_selected');
+
+  if (gamePlay && gameMode == 1) {
+    let isNeighbor = false;
+    if (!this.allNode) {
+      // Then it means allNodes has not been processed
+      // So we process it
+      let gameGraph = procGraph.getGraphMatrix();
+      Game.allNodes = Game.createNodesObject(gameGraph);
+    }
+
+    // Check if the rules alows the spider to move
+    let currentSpidersIndex = procGraph.getSpiders();
+    let currentSpiderNode = Game.allNodes[currentSpidersIndex[0]];
+
+    let newSpiderIndex = newSpiderEl.data('node-index');
+
+    // Check if the newSpider is in the currentSpiderNode or not
+    for (aNeighbor of currentSpiderNode.neighbors) {
+      if (aNeighbor.index == newSpiderIndex) {
+        isNeighbor = true;
+        break;
+      }
+    }
+
+    if (!isNeighbor) {
+      text = `راسی را انتخاب کنید که امکان حرکت به آن را داشته باشید.`;
+      toast(text, 'red');
+      // Then we know we couldn't continue
+      return;
+    }
+  }
   // First remove last spider
   procGraph.removeSpider();
 
-  let searchElement = $('.node_selected');
-  if (searchElement.length) {
-    searchElement.addClass('spider');
+  // if (newSpiderEl.length) {
+  newSpiderEl.addClass('spider');
+  // }
+
+  if (gamePlay && gameMode == 1) {
+    // We know that we should play as protector
+    Game.play();
   }
 };
 procGraph.moveSpider = function(newSpiderNodeIndex) {
@@ -481,21 +528,21 @@ Game.bfs = function(spiderNode) {
 
   // Lets make route from start to end
   let route = [];
-  let routeNode = foundedNode;
   // This means we didn't found any route to a winner node
-  if (!foundedNode) return foundedNode;
+  if (!foundedNode) return route;
 
+  let routeNode = foundedNode;
   route.unshift(routeNode);
   while (routeNode.bfs.parent) {
     routeNode = routeNode.bfs.parent;
     route.unshift(routeNode);
   }
 
-  // Lets clear our nodes
-  for (aNode of Game.allNodes) {
-    aNode.bfs.parent = undefined;
-    aNode.bfs.isSeen = false;
-  }
+  // // Lets clear our nodes
+  // for (aNode of Game.allNodes) {
+  //   aNode.bfs.parent = undefined;
+  //   aNode.bfs.isSeen = false;
+  // }
   return route;
 };
 
@@ -518,35 +565,48 @@ Game.bestMove = function(spiderNode) {
     }
   } else {
     let bfs = Game.bfs(spiderNode);
-    if (!bfs) {
-      // It means butterflies won
-      text = `شما بردید! عنکبوت دیگه راهی نداره که ببره`;
-      toast(text);
-
-      // Stop the game
-      Game.setGamePlay(false);
+    if (bfs.length != 0) {
+      distNode = bfs[1];
     }
-    distNode = bfs[1];
   }
   return distNode;
 };
 
 Game.bestCut = function(spiderNode) {
-  let chosenEdge = undefined;
+  let chosenEdge = [];
   // Lets create a dict with all nodes
   let generalDict = Game.makeDictFromNodesSet(this.allNodes);
+  let butterflyNeighbor;
 
   let winnerNeighbors = spiderNode.getWinnerNeighbors();
   if (winnerNeighbors.length == 0) {
     // If spider node has no node which is a winner
     // We cut an edge that more winners will transform to not winners
+    // And if we have no winner node except butterflies, we find the spider route
+    // Then remove the last edge from it's route
 
-    // Find the most common edge in generalDict
-    let mostEdgesCount = 0;
-    for (setOfEdges of generalDict) {
-      if (setOfEdges.length > mostEdgesCount) {
-        mostEdgesCount = setOfEdges.length;
-        chosenEdge = setOfEdges[0];
+    // If we have winner nodes except butterflies
+    if (generalDict.length != 0) {
+      // Find the most common edge in generalDict
+      let mostEdgesCount = 0;
+      for (setOfEdges of generalDict) {
+        if (setOfEdges.length > mostEdgesCount) {
+          mostEdgesCount = setOfEdges.length;
+          chosenEdge = setOfEdges[0];
+        }
+      }
+    } else {
+      // we have no winner node except butterflies
+      let route = Game.bfs(spiderNode);
+
+      if (route.length) {
+        // It means that we have a route from spider to butterflies
+        let routeLength = route.length;
+
+        let fromNode = route[routeLength - 2];
+        let toNode = route[routeLength - 1];
+
+        chosenEdge = Game.makeEdge(fromNode.index, toNode.index);
       }
     }
   } else {
@@ -563,15 +623,13 @@ Game.bestCut = function(spiderNode) {
       }
     }
 
-    console.log(subscriptionSet);
-
     if (subscriptionSet.length == 0) {
       // If it happens, we know that a butterfly is in the neighbors
 
       // Let's find the butterfly neighbor
       for (aNode of winnerNeighbors) {
         if (aNode.isButterfly) {
-          let butterflyNeighbor = aNode;
+          butterflyNeighbor = aNode;
         }
       }
 
@@ -588,7 +646,6 @@ Game.bestCut = function(spiderNode) {
       }
     }
   }
-  console.log(chosenEdge);
   return chosenEdge;
 };
 
@@ -611,6 +668,9 @@ Game.setGamePlay = function(newGamePlay) {
 
   // If there was no error
   if (newGamePlay) {
+    // Add node index data to svg
+    Game.addIndexData();
+
     text = `بازی شروع شده! حرکتت رو انجام بده`;
     toast(text);
   }
@@ -619,17 +679,17 @@ Game.setGamePlay = function(newGamePlay) {
 Game.makeDictFromNodesSet = function(someNodes) {
   let mydict = [];
   let founded = false;
-  for (winnerNeighbor of someNodes) {
-    for (winnerSetEdge of winnerNeighbor.set) {
+  for (aNode of someNodes) {
+    for (aNodeSetEdge of aNode.set) {
       for (el of mydict) {
-        if (isArrayExistsInArray(el, winnerSetEdge)) {
-          el.push(winnerSetEdge);
+        if (isArrayExistsInArray(el, aNodeSetEdge)) {
+          el.push(aNodeSetEdge);
           founded = true;
           break;
         }
       }
       if (!founded) {
-        mydict.push([winnerSetEdge]);
+        mydict.push([aNodeSetEdge]);
         founded = false;
       }
     }
@@ -637,16 +697,15 @@ Game.makeDictFromNodesSet = function(someNodes) {
   return mydict;
 };
 
+Game.addIndexData = function() {
+  for (aNode of nodes) {
+    procGraph.addData('node-index', String(aNode.index), aNode.index);
+  }
+};
+
 Game.play = function() {
   let gameGraph = procGraph.getGraphMatrix();
   this.allNodes = Game.createNodesObject(gameGraph);
-  console.log(this.allNodes);
-
-  // add nodes index to svg circle class
-  // This is temporary
-  for (aNode of this.allNodes) {
-    procGraph.addClass(String(aNode.index), aNode.index);
-  }
 
   let butterfliesIndexes = procGraph.getButterflies();
   Game.createWinners(butterfliesIndexes);
@@ -657,8 +716,17 @@ Game.play = function() {
 
   // computer plays as spider
   if (gameMode == 0) {
-    // DistinationNode: [targetNode.index, targetNode.isButterfly]
     let distinationNode = Game.bestMove(spiderNode);
+
+    if (!distinationNode) {
+      // It means butterflies won
+      text = `شما بردید! عنکبوت دیگه راهی نداره که ببره`;
+      toast(text);
+
+      // Stop the game
+      Game.setGamePlay(false);
+      return;
+    }
     procGraph.moveSpider(distinationNode.index);
 
     if (distinationNode.isButterfly) {
@@ -673,11 +741,29 @@ Game.play = function() {
   // Computer plays as protector
   if (gameMode == 1) {
     let distinationLink = Game.bestCut(spiderNode);
-    console.log(distinationLink);
-    // Delete the link
-    let fromNodeIndex = distinationLink[0];
-    let targetNodeIndex = distinationLink[1];
-    procGraph.removeLink(fromNodeIndex, targetNodeIndex);
+
+    if (distinationLink.length) {
+      // Delete the link
+      let fromNodeIndex = distinationLink[0];
+      let targetNodeIndex = distinationLink[1];
+      procGraph.removeLink(fromNodeIndex, targetNodeIndex);
+
+      // We should create allNodes again to know if the protector won or not
+      gameGraph = procGraph.getGraphMatrix();
+      this.allNodes = [];
+      this.allNodes = Game.createNodesObject(gameGraph);
+      Game.createWinners(butterfliesIndexes);
+
+      // Now run bfs again
+      let route = Game.bfs(spiderNode);
+      if (route.length == 0) {
+        // It means there is route from spider to butterflies
+        text = `شما باختید! نتونستید به پروانه برسید`;
+        toast(text, 'red');
+
+        Game.setGamePlay(false);
+      }
+    }
   }
 
   // Reset date
@@ -738,10 +824,6 @@ window.addEventListener('keydown', e => {
       break;
     case 's':
       procGraph.addSpider(key);
-      if (gamePlay && gameMode == 1) {
-        // We know that we should play as protector
-        Game.play();
-      }
       break;
     case 'e':
       procGraph.createExportFile();
@@ -753,14 +835,6 @@ window.addEventListener('keydown', e => {
 
 // Download the text that is given to it
 function saveFile(text) {
-  // var pom = document.createElement('a');
-  // pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURI(text));
-  // pom.setAttribute('download', 'graphData');
-
-  // pom.style.display = 'none';
-  // document.body.appendChild(pom);
-  // pom.click();
-  // document.body.removeChild(pom);
   var blob = new Blob([text], {
     type: 'text/plain;charset=utf-8'
   });
