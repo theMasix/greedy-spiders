@@ -740,6 +740,16 @@ Game.play = function() {
 
   // Computer plays as protector
   if (gameMode == 1) {
+    console.log(spiderNode);
+    if (spiderNode.isButterfly) {
+      // It means the spider won
+      let text = `شما بردید. به پروانه رسیدید!`;
+      toast(text);
+
+      Game.setGamePlay(false);
+      return;
+    }
+
     let distinationLink = Game.bestCut(spiderNode);
 
     if (distinationLink.length) {
