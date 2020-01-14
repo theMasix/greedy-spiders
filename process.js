@@ -154,7 +154,8 @@ procGraph.handleReadFile = function(content) {
   splittedData.splice(0, 1);
 
   if (spiderCount) {
-    spiderIndex = Number(splittedData[0]);
+    // Minus one because our index starts at 0
+    spiderIndex = Number(splittedData[0] - 1);
     // remove spiderIndex from splittedData
     splittedData.splice(0, 1);
   }
@@ -164,8 +165,9 @@ procGraph.handleReadFile = function(content) {
   splittedData.splice(0, 1);
 
   if (butterfliesCount) {
+    // Minus one because our index starts at 0
     butterfliesIndexes = splittedData[0].split(' ').map(value => {
-      return Number(value);
+      return Number(value) - 1;
     });
     // remove butterfliesIndexes from splittedData
     splittedData.splice(0, 1);
@@ -355,6 +357,8 @@ procGraph.createExportFile = function() {
   }
 
   let spiders = procGraph.getSpiders();
+  // Minus one because our index starts at 0
+  spiders = spiders.map(num => num + 1);
   // Add number of spiders
   textToSave += prepareTextToWrite(spiders.length);
   if (spiders.length) {
@@ -363,6 +367,9 @@ procGraph.createExportFile = function() {
   }
 
   let butterflies = procGraph.getButterflies();
+  // Minus one because our index starts at 0
+
+  butterflies = butterflies.map(num => num + 1);
 
   // Add number of butterflies
   textToSave += prepareTextToWrite(butterflies.length);
