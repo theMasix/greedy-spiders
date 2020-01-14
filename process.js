@@ -740,7 +740,6 @@ Game.play = function() {
 
   // Computer plays as protector
   if (gameMode == 1) {
-    console.log(spiderNode);
     if (spiderNode.isButterfly) {
       // It means the spider won
       let text = `شما بردید. به پروانه رسیدید!`;
