@@ -16,7 +16,7 @@ var force = d3.layout
   .force()
   .size([width, height])
   .nodes([{}]) // initialize with a single node
-  .linkDistance(50)
+  .linkDistance(25)
   .charge(-1200)
   .on('tick', tick);
 

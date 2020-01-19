@@ -505,17 +505,16 @@ Game.createWinners = function(butterfliesIndexes) {
 
 Game.bfs = function(spiderNode) {
   let foundedNode = undefined;
+  let current = undefined;
   let queue = [];
   spiderNode.bfs.isSeen = true;
   queue.push(spiderNode);
 
   while (queue.length != 0) {
-    let current = queue.shift();
+    current = queue.shift();
 
     // If we go to next level from our last founded isWinner
-    if (foundedNode && current.bfs.parent != foundedNode.bfs.parent) {
-      break;
-    }
+    if (foundedNode && current.bfs.parent != foundedNode.bfs.parent) break;
 
     if (current.isWinner) {
       // We found a butterfly
@@ -536,7 +535,9 @@ Game.bfs = function(spiderNode) {
   // Lets make route from start to end
   let route = [];
   // This means we didn't found any route to a winner node
-  if (!foundedNode) return route;
+  if (!foundedNode) {
+    return route;
+  }
 
   let routeNode = foundedNode;
   route.unshift(routeNode);
@@ -583,7 +584,7 @@ Game.bestCut = function(spiderNode) {
   let chosenEdge = [];
   // Lets create a dict with all nodes
   let generalDict = Game.makeDictFromNodesSet(this.allNodes);
-  let butterflyNeighbor;
+  let butterflyNeighbor = undefined;
 
   let winnerNeighbors = spiderNode.getWinnerNeighbors();
   if (winnerNeighbors.length == 0) {
@@ -640,6 +641,23 @@ Game.bestCut = function(spiderNode) {
         }
       }
 
+      if (!butterflyNeighbor) {
+        // If butterflyNeighbor is undefined!
+        // Means that non of the neighbors is not winnners
+        // So we cut as we cut when winnerNeighbors.length == 0
+
+        // Find the most common edge in generalDict
+        let mostEdgesCount = 0;
+        for (setOfEdges of generalDict) {
+          if (setOfEdges.length > mostEdgesCount) {
+            mostEdgesCount = setOfEdges.length;
+            chosenEdge = setOfEdges[0];
+            return chosenEdge;
+          }
+        }
+      }
+
+      // Then cut the edges between spiderNode and butterflyNode
       chosenEdge = Game.makeEdge(spiderNode.index, butterflyNeighbor.index);
       return chosenEdge;
     }
@@ -765,10 +783,12 @@ Game.play = function() {
       procGraph.removeLink(fromNodeIndex, targetNodeIndex);
 
       // We should create allNodes again to know if the protector won or not
-      gameGraph = procGraph.getGraphMatrix();
-      this.allNodes = [];
+      let gameGraph = procGraph.getGraphMatrix();
       this.allNodes = Game.createNodesObject(gameGraph);
       Game.createWinners(butterfliesIndexes);
+      // Get the spider node again
+      let spidersIndex = procGraph.getSpiders();
+      let spiderNode = this.allNodes[spidersIndex[0]];
 
       // Now run bfs again
       let route = Game.bfs(spiderNode);
