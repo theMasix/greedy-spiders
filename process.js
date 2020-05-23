@@ -732,6 +732,8 @@ Game.play = function() {
   let gameGraph = procGraph.getGraphMatrix();
   this.allNodes = Game.createNodesObject(gameGraph);
 
+  console.log(this.allNodes);
+
   let butterfliesIndexes = procGraph.getButterflies();
   Game.createWinners(butterfliesIndexes);
 
